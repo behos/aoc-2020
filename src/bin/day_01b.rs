@@ -1,9 +1,7 @@
-use aoc_2020::read_lines;
+use aoc_2020::read_entries;
 
 fn main() {
-    let entries: Vec<_> = read_lines("./data/day-01.txt")
-        .map(|s| s.parse::<usize>().expect("Failed to parse line."))
-        .collect();
+    let entries: Vec<_> = read_entries::<usize>("./data/day-01.txt").collect();
 
     // Let's do a naive solution.
     for i in 0..entries.len() {
