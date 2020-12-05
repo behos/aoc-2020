@@ -1,12 +1,18 @@
 use aoc_2020::read_entries;
+use std::{cmp, usize::MAX};
 
 fn main() {
-    let mut ids: Vec<_> = read_entries::<String>("./data/day-05.txt")
+    let (min, max, sum) = read_entries::<String>("./data/day-05.txt")
         .map(to_seat_id)
-        .collect();
-    ids.sort_unstable();
-    println!("Found max seat id {}", ids[ids.len() - 1]);
-    println!("Found my seat {}", find_missing(&ids));
+        .fold((MAX, 0, 0), |(min, max, sum), current| {
+            (
+                cmp::min(min, current),
+                cmp::max(max, current),
+                sum + current,
+            )
+        });
+    println!("Found max seat id {}", max);
+    println!("Found my seat {}", find_missing(min, max, sum));
 }
 
 fn to_seat_id(id: String) -> usize {
@@ -32,13 +38,6 @@ fn split((min, max): (usize, usize), high: bool) -> (usize, usize) {
     }
 }
 
-fn find_missing(ids: &[usize]) -> usize {
-    let mut range = (0, ids.len());
-    let offset = ids[0];
-    while range.0 < range.1 {
-        let (min, max) = range;
-        let mid = (min + max) / 2;
-        range = split(range, ids[mid] == mid + offset);
-    }
-    range.0 + offset
+fn find_missing(min: usize, max: usize, sum: usize) -> usize {
+    (max - (min - 1)) * (max + min) / 2 - sum
 }
