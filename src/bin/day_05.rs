@@ -1,11 +1,10 @@
 use aoc_2020::read_entries;
-use std::collections::BinaryHeap;
 
 fn main() {
-    let ids = read_entries::<String>("./data/day-05.txt")
+    let mut ids: Vec<_> = read_entries::<String>("./data/day-05.txt")
         .map(to_seat_id)
-        .collect::<BinaryHeap<_>>()
-        .into_sorted_vec();
+        .collect();
+    ids.sort_unstable();
     println!("Found max seat id {}", ids[ids.len() - 1]);
     println!("Found my seat {}", find_missing(&ids));
 }
