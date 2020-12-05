@@ -16,26 +16,17 @@ fn main() {
 }
 
 fn to_seat_id(id: String) -> usize {
-    let (row_range, col_range) = id.chars().enumerate().fold(
-        ((0, 127), (0, 7)),
-        |(row, col), (index, c)| {
-            if index < 7 {
-                (split(row, c == 'B'), col)
-            } else {
-                (row, split(col, c == 'R'))
-            }
-        },
-    );
-    row_range.0 * 8 + col_range.0
-}
-
-fn split((min, max): (usize, usize), high: bool) -> (usize, usize) {
-    let mid = (min + max) / 2;
-    if high {
-        (mid + 1, max)
-    } else {
-        (min, mid)
-    }
+    usize::from_str_radix(
+        &id.chars()
+            .map(|c| match c {
+                'B' | 'R' => '1',
+                'F' | 'L' => '0',
+                _ => panic!("Unexpected char"),
+            })
+            .collect::<String>(),
+        2,
+    )
+    .expect("This is for sure an int")
 }
 
 fn find_missing(min: usize, max: usize, sum: usize) -> usize {
