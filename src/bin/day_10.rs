@@ -1,24 +1,40 @@
 use aoc_2020::read_entries;
+use std::usize;
 
 fn main() {
     let mut numbers: Vec<_> =
         read_entries::<usize>("./data/day-10.txt").collect();
     numbers.sort();
-    let mut count_1 = if numbers[0] == 1 { 1 } else { 0 };
-    let mut count_3 = if numbers[0] == 3 { 2 } else { 1 };
-    for i in 1..numbers.len() {
-        match numbers[i] - numbers[i - 1] {
-            3 => {
-                count_3 += 1;
-            }
-            1 => {
-                count_1 += 1;
-            }
-            _ => {}
+
+    println!("Jumps {}", get_jumps(&numbers));
+    println!("Permutations {}", get_permutations(&numbers));
+}
+
+fn get_jumps(numbers: &[usize]) -> usize {
+    let (j1, j3) = (0..numbers.len()).fold((0, 1), |(j1, j3), index| {
+        let prev = if index == 0 { 0 } else { numbers[index - 1] };
+        let cur = numbers[index];
+        match cur - prev {
+            1 => (j1 + 1, j3),
+            3 => (j1, j3 + 1),
+            _ => (j1, j3),
+        }
+    });
+    j1 * j3
+}
+
+fn get_permutations(numbers: &[usize]) -> usize {
+    let mut paths = vec![0 as usize; numbers.len()];
+    for i in 0..numbers.len() {
+        let val = numbers[i];
+        if val <= 3 {
+            paths[i] += 1;
+        }
+        let mut j = i;
+        while j > 0 && val - numbers[j - 1] <= 3 {
+            paths[i] += paths[j - 1];
+            j -= 1;
         }
     }
-    println!("Result: {} * {} = {}", count_1, count_3, count_1 * count_3);
-
-    // let perms = find_permutations(&numbers);
-    // println!("Perms {}", perms);
+    paths[numbers.len() - 1]
 }
