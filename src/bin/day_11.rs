@@ -2,6 +2,17 @@ use anyhow::{bail, Error, Result};
 use aoc_2020::read_entries;
 use std::{cmp, str::FromStr};
 
+const DIRECTIONS: [(isize, isize); 8] = [
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+    (0, -1),
+    (0, 1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+];
+
 #[derive(PartialEq, Clone, Copy)]
 enum Space {
     Occupied,
@@ -34,35 +45,28 @@ impl Seating {
         self.spaces.len()
     }
 
-    fn next(&self) -> Self {
-        Seating {
-            spaces: self
-                .spaces
-                .iter()
-                .enumerate()
-                .map(|(i, row)| {
-                    row.iter()
-                        .enumerate()
-                        .map(|(j, seat)| match seat {
-                            Space::Floor => Space::Floor,
-                            Space::Occupied => {
-                                if self.occupied_neighbors(i, j, Some(1)) >= 4 {
-                                    Space::Empty
-                                } else {
-                                    Space::Occupied
-                                }
-                            }
-                            Space::Empty => {
-                                if self.occupied_neighbors(i, j, Some(1)) == 0 {
-                                    Space::Occupied
-                                } else {
-                                    Space::Empty
-                                }
-                            }
-                        })
-                        .collect()
-                })
-                .collect(),
+    fn next(&self, limit: usize, max_distance: Option<usize>) -> Self {
+        let mut spaces = vec![vec![Space::Floor; self.width()]; self.height()];
+        for i in 0..self.height() {
+            for j in 0..self.width() {
+                spaces[i][j] = self.next_state(i, j, limit, max_distance);
+            }
+        }
+        Seating { spaces }
+    }
+
+    fn next_state(
+        &self,
+        i: usize,
+        j: usize,
+        limit: usize,
+        max_distance: Option<usize>,
+    ) -> Space {
+        let occupied_neighbors = self.occupied_neighbors(i, j, max_distance);
+        match (self.spaces[i][j], occupied_neighbors) {
+            (Space::Occupied, o) if o >= limit => Space::Empty,
+            (Space::Empty, 0) => Space::Occupied,
+            (space, _) => space,
         }
     }
 
@@ -73,52 +77,13 @@ impl Seating {
             .sum()
     }
 
-    fn next_part_2(&self) -> Self {
-        Seating {
-            spaces: self
-                .spaces
-                .iter()
-                .enumerate()
-                .map(|(i, row)| {
-                    row.iter()
-                        .enumerate()
-                        .map(|(j, seat)| match seat {
-                            Space::Floor => Space::Floor,
-                            Space::Occupied => {
-                                if self.occupied_neighbors(i, j, None) >= 5 {
-                                    Space::Empty
-                                } else {
-                                    Space::Occupied
-                                }
-                            }
-                            Space::Empty => {
-                                if self.occupied_neighbors(i, j, None) == 0 {
-                                    Space::Occupied
-                                } else {
-                                    Space::Empty
-                                }
-                            }
-                        })
-                        .collect()
-                })
-                .collect(),
-        }
-    }
-
     fn occupied_neighbors(
         &self,
         x: usize,
         y: usize,
         max_depth: Option<usize>,
     ) -> usize {
-        let steps: [isize; 3] = [-1, 0, 1];
-        let directions: Vec<(isize, isize)> = steps
-            .iter()
-            .map(|i| steps.iter().map(move |j| (*i, *j)))
-            .flatten()
-            .filter(|(x, y)| *x != 0 || *y != 0)
-            .collect();
-        directions
+        DIRECTIONS
             .iter()
             .map(|direction| {
                 self.first_in_direction(direction, x, y, max_depth)
@@ -193,7 +158,7 @@ fn main() {
     let initial_seating = Seating { spaces };
     let mut current_seating = initial_seating.clone();
     loop {
-        let next = current_seating.next();
+        let next = current_seating.next(4, Some(1));
         if next == current_seating {
             break;
         }
@@ -206,7 +171,7 @@ fn main() {
 
     let mut current_seating = initial_seating.clone();
     loop {
-        let next = current_seating.next_part_2();
+        let next = current_seating.next(5, None);
         if next == current_seating {
             break;
         }
