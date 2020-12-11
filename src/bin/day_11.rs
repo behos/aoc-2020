@@ -1,6 +1,6 @@
 use anyhow::{bail, Error, Result};
 use aoc_2020::read_entries;
-use std::{cmp, str::FromStr};
+use std::str::FromStr;
 
 const DIRECTIONS: [(isize, isize); 8] = [
     (-1, -1),
@@ -45,11 +45,11 @@ impl Seating {
         self.spaces.len()
     }
 
-    fn next(&self, limit: usize, max_distance: Option<usize>) -> Self {
+    fn next(&self, limit: usize, visible: &[Space]) -> Self {
         let mut spaces = vec![vec![Space::Floor; self.width()]; self.height()];
         for i in 0..self.height() {
             for j in 0..self.width() {
-                spaces[i][j] = self.next_state(i, j, limit, max_distance);
+                spaces[i][j] = self.next_state(i, j, limit, visible);
             }
         }
         Seating { spaces }
@@ -59,35 +59,26 @@ impl Seating {
         &self,
         i: usize,
         j: usize,
-        limit: usize,
-        max_distance: Option<usize>,
+        tolerance: usize,
+        visible: &[Space],
     ) -> Space {
-        let occupied_neighbors = self.occupied_neighbors(i, j, max_distance);
+        let occupied_neighbors = self.occupied_neighbors(i, j, visible);
         match (self.spaces[i][j], occupied_neighbors) {
-            (Space::Occupied, o) if o >= limit => Space::Empty,
+            (Space::Occupied, o) if o >= tolerance => Space::Empty,
             (Space::Empty, 0) => Space::Occupied,
             (space, _) => space,
         }
-    }
-
-    fn count_occupied(&self) -> usize {
-        self.spaces
-            .iter()
-            .map(|row| row.iter().filter(|s| s == &&Space::Occupied).count())
-            .sum()
     }
 
     fn occupied_neighbors(
         &self,
         x: usize,
         y: usize,
-        max_depth: Option<usize>,
+        visible: &[Space],
     ) -> usize {
         DIRECTIONS
             .iter()
-            .map(|direction| {
-                self.first_in_direction(direction, x, y, max_depth)
-            })
+            .map(|direction| self.first_in_direction(direction, x, y, visible))
             .filter(|s| s == &Space::Occupied)
             .count()
     }
@@ -97,15 +88,15 @@ impl Seating {
         (dx, dy): &(isize, isize),
         x: usize,
         y: usize,
-        max_distance: Option<usize>,
+        visible: &[Space],
     ) -> Space {
         let (mut pos_x, mut pos_y) = (x as isize, y as isize);
         loop {
             pos_x = pos_x + dx;
             pos_y = pos_y + dy;
-            if self.in_bounds(pos_x, pos_y, x, y, max_distance) {
+            if self.in_bounds(pos_x, pos_y) {
                 let space = self.spaces[pos_x as usize][pos_y as usize];
-                if space != Space::Floor {
+                if visible.contains(&space) {
                     return space;
                 }
             } else {
@@ -114,26 +105,18 @@ impl Seating {
         }
     }
 
-    fn in_bounds(
-        &self,
-        p_x: isize,
-        p_y: isize,
-        x: usize,
-        y: usize,
-        max_distance: Option<usize>,
-    ) -> bool {
-        let (min_x, max_x, min_y, max_y) = match max_distance {
-            Some(i) => (
-                cmp::max(0, x as isize - i as isize),
-                cmp::min(self.height() - 1, x + i) as isize,
-                cmp::max(0, y as isize - i as isize),
-                cmp::min(self.width() - 1, y + i) as isize,
-            ),
-            None => {
-                (0, self.height() as isize - 1, 0, self.width() as isize - 1)
-            }
-        };
-        p_x >= min_x && p_y >= min_y && p_x <= max_x && p_y <= max_y
+    fn in_bounds(&self, p_x: isize, p_y: isize) -> bool {
+        p_x >= 0
+            && p_y >= 0
+            && p_x <= (self.height() - 1) as isize
+            && p_y <= (self.width() - 1) as isize
+    }
+
+    fn count_occupied(&self) -> usize {
+        self.spaces
+            .iter()
+            .map(|row| row.iter().filter(|s| s == &&Space::Occupied).count())
+            .sum()
     }
 }
 
@@ -156,22 +139,19 @@ fn main() {
         .map(|Entry(spaces)| spaces)
         .collect();
     let initial_seating = Seating { spaces };
-    let mut current_seating = initial_seating.clone();
-    loop {
-        let next = current_seating.next(4, Some(1));
-        if next == current_seating {
-            break;
-        }
-        current_seating = next;
-    }
-    println!(
-        "There are {} occupied seats.",
-        current_seating.count_occupied()
-    );
 
-    let mut current_seating = initial_seating.clone();
+    run_simulation(
+        &initial_seating,
+        4,
+        &[Space::Occupied, Space::Floor, Space::Empty],
+    );
+    run_simulation(&initial_seating, 5, &[Space::Occupied, Space::Empty]);
+}
+
+fn run_simulation(seating: &Seating, tolerance: usize, visible: &[Space]) {
+    let mut current_seating = seating.clone();
     loop {
-        let next = current_seating.next(5, None);
+        let next = current_seating.next(tolerance, visible);
         if next == current_seating {
             break;
         }
