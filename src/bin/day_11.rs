@@ -45,11 +45,11 @@ impl Seating {
         self.spaces.len()
     }
 
-    fn next(&self, limit: usize, visible: &[Space]) -> Self {
+    fn next(&self, tolerance: usize, visible: &[Space]) -> Self {
         let mut spaces = vec![vec![Space::Floor; self.width()]; self.height()];
-        for i in 0..self.height() {
-            for j in 0..self.width() {
-                spaces[i][j] = self.next_state(i, j, limit, visible);
+        for x in 0..self.height() {
+            for y in 0..self.width() {
+                spaces[x][y] = self.next_state(x, y, tolerance, visible);
             }
         }
         Seating { spaces }
@@ -57,13 +57,13 @@ impl Seating {
 
     fn next_state(
         &self,
-        i: usize,
-        j: usize,
+        x: usize,
+        y: usize,
         tolerance: usize,
         visible: &[Space],
     ) -> Space {
-        let occupied_neighbors = self.occupied_neighbors(i, j, visible);
-        match (self.spaces[i][j], occupied_neighbors) {
+        let occupied_neighbors = self.occupied_neighbors(x, y, visible);
+        match (self.spaces[x][y], occupied_neighbors) {
             (Space::Occupied, o) if o >= tolerance => Space::Empty,
             (Space::Empty, 0) => Space::Occupied,
             (space, _) => space,
@@ -79,7 +79,7 @@ impl Seating {
         DIRECTIONS
             .iter()
             .map(|direction| self.first_in_direction(direction, x, y, visible))
-            .filter(|s| s == &Space::Occupied)
+            .filter(|&s| s == Space::Occupied)
             .count()
     }
 
@@ -115,7 +115,7 @@ impl Seating {
     fn count_occupied(&self) -> usize {
         self.spaces
             .iter()
-            .map(|row| row.iter().filter(|s| s == &&Space::Occupied).count())
+            .map(|row| row.iter().filter(|&&s| s == Space::Occupied).count())
             .sum()
     }
 }
@@ -139,13 +139,10 @@ fn main() {
         .map(|Entry(spaces)| spaces)
         .collect();
     let initial_seating = Seating { spaces };
-
-    run_simulation(
-        &initial_seating,
-        4,
-        &[Space::Occupied, Space::Floor, Space::Empty],
-    );
-    run_simulation(&initial_seating, 5, &[Space::Occupied, Space::Empty]);
+    let all_spaces = &[Space::Occupied, Space::Floor, Space::Empty];
+    let just_chairs = &[Space::Occupied, Space::Empty];
+    run_simulation(&initial_seating, 4, all_spaces);
+    run_simulation(&initial_seating, 5, just_chairs);
 }
 
 fn run_simulation(seating: &Seating, tolerance: usize, visible: &[Space]) {
