@@ -6,7 +6,6 @@ use std::str::FromStr;
 enum Relative {
     Left,
     Right,
-    Forward,
 }
 
 impl Relative {
@@ -14,7 +13,6 @@ impl Relative {
         match self {
             Relative::Left => (-y, x),
             Relative::Right => (y, -x),
-            Relative::Forward => (x, y),
         }
     }
 }
@@ -38,7 +36,6 @@ impl Compass {
             (Relative::Right, Compass::East) => Compass::South,
             (Relative::Right, Compass::South) => Compass::West,
             (Relative::Right, Compass::West) => Compass::North,
-            (Relative::Forward, c) => *c,
         }
     }
 
@@ -55,6 +52,7 @@ impl Compass {
 enum Direction {
     Absolute(Compass),
     Relative(Relative),
+    Forward,
 }
 
 struct Instruction {
@@ -74,7 +72,7 @@ impl FromStr for Instruction {
                 'W' => Direction::Absolute(Compass::West),
                 'L' => Direction::Relative(Relative::Left),
                 'R' => Direction::Relative(Relative::Right),
-                'F' => Direction::Relative(Relative::Forward),
+                'F' => Direction::Forward,
                 hm => bail!("What is {}?", hm),
             };
         let amount = input[1..]
@@ -102,9 +100,7 @@ impl Ship {
         let amount = instruction.amount;
         match &instruction.direction {
             Direction::Absolute(compass) => self.move_ship(*compass, amount),
-            Direction::Relative(Relative::Forward) => {
-                self.move_ship(self.facing_direction, amount)
-            }
+            Direction::Forward => self.move_ship(self.facing_direction, amount),
             Direction::Relative(direction) => self.turn(direction, amount),
         }
     }
@@ -141,7 +137,7 @@ impl ShipWithWaypoint {
             Direction::Absolute(compass) => {
                 self.move_waypoint(*compass, amount)
             }
-            Direction::Relative(Relative::Forward) => self.move_ship(amount),
+            Direction::Forward => self.move_ship(amount),
             Direction::Relative(direction) => {
                 self.rotate_waypoint(*direction, amount)
             }
