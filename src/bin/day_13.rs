@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     let res = next_departure(timestamp, &bus_ids)?;
     println!("Result part 1 {}", res);
     let res = golden_coin(&bus_ids);
-    println!("Result part 1 {}", res);
+    println!("Result part 2 {}", res);
     Ok(())
 }
 
@@ -44,20 +44,22 @@ fn golden_coin(bus_ids: &[&str]) -> usize {
         })
         .fold((0, 1), |(acc_offset, acc_id), (offset, id)| {
             let lcm = num::integer::lcm(acc_id, id);
-            dbg!((merged_offset((acc_offset, acc_id), (offset, id)), lcm))
+            let first = first_match((acc_offset, acc_id), (offset, id));
+            (first, lcm)
         });
     merged_id - merged_offset
 }
 
-fn merged_offset(
+fn first_match(
     (offset_a, id_a): (usize, usize),
     (offset_b, id_b): (usize, usize),
 ) -> usize {
-    let mut candidate = 0;
+    let mut multiplier = 0;
     loop {
-        candidate += id_a;
-        if candidate - offset_a % id_b == 0 {
-            return candidate + offset_b - offset_a;
+        multiplier += 1;
+        let candidate = id_a * multiplier + offset_a;
+        if (candidate > offset_b) && (candidate - offset_b) % id_b == 0 {
+            return candidate;
         }
     }
 }
