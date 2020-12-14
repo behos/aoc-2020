@@ -5,7 +5,7 @@ use regex::Regex;
 use std::{
     collections::HashMap,
     str::{self, FromStr},
-    u64,
+    usize,
 };
 
 lazy_static! {
@@ -13,23 +13,23 @@ lazy_static! {
         Regex::new("^mem\\[(?P<address>\\d+)\\] = (?P<value>\\d+)$").unwrap();
 }
 
-struct Program {
+struct ProgramV1 {
     mask: Vec<(usize, u8)>,
-    memory: HashMap<usize, u64>,
+    memory: HashMap<usize, usize>,
 }
 
-impl Program {
+impl ProgramV1 {
     fn new() -> Self {
-        Self {
+        ProgramV1 {
             mask: vec![],
             memory: HashMap::new(),
         }
     }
 
-    fn execute(&mut self, command: Command) -> Result<()> {
+    fn execute(&mut self, command: &Command) -> Result<()> {
         match command {
             Command::Mask(mask) => Ok(self.update_mask(&mask)),
-            Command::Mem(address, value) => self.set_mem(address, value),
+            Command::Mem(address, value) => self.set_mem(*address, *value),
         }
     }
 
@@ -40,32 +40,110 @@ impl Program {
             .cloned()
             .enumerate()
             .filter(|(_, c)| c != &b'X')
-            .map(|(i, c)| (i + 64 - 36, c)) // Offset for 64 bits
             .collect();
     }
 
-    fn set_mem(&mut self, address: usize, val: u64) -> Result<()> {
-        let mut bin = format!("{:064b}", val).into_bytes();
-        for (offset, val) in &self.mask {
-            bin[*offset] = *val;
-        }
-        let entry = self.memory.entry(address).or_insert(val);
-        *entry = u64::from_str_radix(
-            str::from_utf8(&bin).context("Failed to parse what I created.")?,
-            2,
-        )
-        .context("Unparseable binary.")?;
+    fn set_mem(&mut self, address: usize, val: usize) -> Result<()> {
+        let mask_val = self.apply_mask(val)?;
+        self.memory.insert(address, mask_val);
         Ok(())
     }
 
-    fn mem_sum(&self) -> u64 {
+    fn apply_mask(&self, val: usize) -> Result<usize> {
+        let mut bin = format!("{:036b}", val).into_bytes();
+        for (offset, val) in &self.mask {
+            bin[*offset] = *val;
+        }
+        usize::from_str_radix(
+            str::from_utf8(&bin).context("Failed to parse what I created.")?,
+            2,
+        )
+        .context("Unparseable binary.")
+    }
+
+    fn mem_sum(&self) -> usize {
+        self.memory.values().sum()
+    }
+}
+
+struct ProgramV2 {
+    mask: Vec<u8>,
+    memory: HashMap<usize, usize>,
+}
+
+impl ProgramV2 {
+    fn new() -> Self {
+        ProgramV2 {
+            mask: vec![],
+            memory: HashMap::new(),
+        }
+    }
+
+    fn execute(&mut self, command: &Command) -> Result<()> {
+        match command {
+            Command::Mask(mask) => self.mask = mask.clone().into_bytes(),
+            Command::Mem(address, value) => {
+                self.set_mem_range(*address, *value)?
+            }
+        }
+        Ok(())
+    }
+
+    fn set_mem_range(&mut self, address: usize, val: usize) -> Result<()> {
+        for a in self.addresses(address)? {
+            self.memory.insert(a, val);
+        }
+        Ok(())
+    }
+
+    fn addresses(&self, address: usize) -> Result<Vec<usize>> {
+        let mut address_bin = format!("{:036b}", address).into_bytes();
+        for (i, byte) in self.mask.iter().enumerate() {
+            match byte {
+                b'1' => address_bin[i] = b'1',
+                b'0' => {}
+                b'X' => address_bin[i] = b'0',
+                hm => bail!("What is {}", hm),
+            }
+        }
+
+        let floating_indices: Vec<usize> = self
+            .mask
+            .iter()
+            .enumerate()
+            .filter(|(_, &c)| c == b'X')
+            .map(|(i, _)| i)
+            .collect();
+
+        let mut addresses = vec![];
+
+        for v in 0..2_usize.pow(floating_indices.len() as u32) {
+            let version_bin = format!("{:064b}", v).into_bytes();
+            for (index, value) in
+                floating_indices.iter().zip(version_bin.iter().rev())
+            {
+                address_bin[*index] = *value;
+                addresses.push(
+                    usize::from_str_radix(
+                        str::from_utf8(&address_bin)
+                            .context("Failed to parse what I created.")?,
+                        2,
+                    )
+                    .context("Unparseable binary.")?,
+                )
+            }
+        }
+        Ok(addresses)
+    }
+
+    fn mem_sum(&self) -> usize {
         self.memory.values().sum()
     }
 }
 
 enum Command {
     Mask(String),
-    Mem(usize, u64),
+    Mem(usize, usize),
 }
 
 impl FromStr for Command {
@@ -102,8 +180,15 @@ impl FromStr for Command {
 }
 
 fn main() -> Result<()> {
-    let mut program = Program::new();
-    for command in read_entries::<Command>("./data/day-14.txt") {
+    let commands: Vec<Command> =
+        read_entries::<Command>("./data/day-14.txt").collect();
+    let mut program = ProgramV1::new();
+    for command in &commands {
+        program.execute(command)?;
+    }
+    println!("Mem sum = {}", program.mem_sum());
+    let mut program = ProgramV2::new();
+    for command in &commands {
         program.execute(command)?;
     }
     println!("Mem sum = {}", program.mem_sum());
