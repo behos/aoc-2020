@@ -71,6 +71,5 @@ mod test {
     fn examples() {
         assert_eq!(1, run_game(&[1, 3, 2], 2020));
         assert_eq!(10, run_game(&[2, 1, 3], 2020));
-        assert_eq!(175_594, run_game(&[0, 3, 6], 30_000_000));
     }
 }
