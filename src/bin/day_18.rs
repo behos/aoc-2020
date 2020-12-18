@@ -20,9 +20,9 @@ impl Expression {
                 Expression::Paren(Box::new(Expression::parse(&inner, op)?))
             }
             _ => {
-                let opi = find_top_level_op(&expression, op)
-                    .or_else(|| find_top_level_op(&expression, None))
-                    .context("Failed to find a top level operator!")?;
+                let opi = find_last_op(&expression, op)
+                    .or_else(|| find_last_op(&expression, None))
+                    .context("Failed to find an operator!")?;
                 let left = Box::new(Expression::parse(&expression[..opi], op)?);
                 let right =
                     Box::new(Expression::parse(&expression[opi + 1..], op)?);
@@ -55,7 +55,6 @@ fn balanced_parens(chars: &[char]) -> bool {
         if c == ')' {
             parens -= 1
         }
-
         if parens < 0 {
             return false;
         }
@@ -63,7 +62,7 @@ fn balanced_parens(chars: &[char]) -> bool {
     parens == 0
 }
 
-fn find_top_level_op(chars: &[char], op: Option<char>) -> Option<usize> {
+fn find_last_op(chars: &[char], op: Option<char>) -> Option<usize> {
     let mut parens = 0;
     for i in (0..chars.len()).rev() {
         match chars[i] {
