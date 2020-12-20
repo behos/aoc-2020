@@ -1,6 +1,7 @@
 use anyhow::{Context, Error, Result};
 use std::{
     collections::{HashMap, HashSet},
+    fmt::{self, Display},
     fs::read_to_string,
     str::FromStr,
 };
@@ -69,6 +70,7 @@ impl Tile {
     }
 }
 
+#[derive(Debug)]
 struct Matrix<T: Copy> {
     inner: Vec<Vec<T>>,
 }
@@ -88,10 +90,39 @@ impl<T: Copy> Matrix<T> {
     }
 }
 
+impl Display for Matrix<char> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.inner
+                .iter()
+                .map(|row| row.iter().collect::<String>())
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Transform {
     rotation: usize,
     flipped: bool,
+}
+
+impl Transform {
+    fn all() -> Vec<Self> {
+        (0..=3)
+            .map(|rotation| {
+                [true, false]
+                    .iter()
+                    .copied()
+                    .map(|flipped| Self { rotation, flipped })
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -113,11 +144,7 @@ fn main() -> Result<()> {
 
     let mut placements = vec![];
     let mut remaining_ids = grids.keys().copied().collect::<HashSet<_>>();
-    if solve(&grids, &mut remaining_ids, &mut placements) {
-        println!("Solved!");
-    } else {
-        println!("Not solved!");
-    }
+    solve(&grids, &mut remaining_ids, &mut placements);
 
     let corner_product = &[
         placements[0],
@@ -131,8 +158,16 @@ fn main() -> Result<()> {
 
     println!("Corner products: {}", corner_product);
 
-    let _compiled_image = compile_image(&grids, &placements);
-
+    let image = compile_image(&grids, &placements);
+    let monsters = find_monsters(&image);
+    let total_roughness = image
+        .inner
+        .iter()
+        .map(|row| row.iter().filter(|c| c == &&'#').count())
+        .sum::<usize>();
+    println!("Found {} monsters.", monsters);
+    println!("Water roughness total {}.", total_roughness);
+    println!("Water roughness {}.", total_roughness - monsters * 15);
     Ok(())
 }
 
@@ -144,25 +179,18 @@ fn solve(
     if remaining_ids.len() == 0 {
         return true;
     }
-    let candidates = remaining_ids.iter().cloned().collect::<Vec<_>>();
+    let mut candidates = remaining_ids.iter().cloned().collect::<Vec<_>>();
+    candidates.sort();
     for id in candidates {
         remaining_ids.remove(&id);
-        for rotation in 0..=3 {
-            for flipped in &[true, false] {
-                let placement = Placement {
-                    id,
-                    transform: Transform {
-                        rotation,
-                        flipped: *flipped,
-                    },
-                };
-                if fits(grids, placements, placement) {
-                    placements.push(placement);
-                    if solve(grids, &mut remaining_ids, &mut placements) {
-                        return true;
-                    }
-                    placements.pop();
+        for transform in Transform::all() {
+            let placement = Placement { id, transform };
+            if fits(grids, placements, placement) {
+                placements.push(placement);
+                if solve(grids, &mut remaining_ids, &mut placements) {
+                    return true;
                 }
+                placements.pop();
             }
         }
         remaining_ids.insert(id);
@@ -214,19 +242,71 @@ fn fits(
 fn compile_image(
     grids: &HashMap<usize, Tile>,
     placements: &[Placement],
-) -> [[char; 96]; 96] {
-    let mut compiled_image = [['.'; 96]; 96];
-    for x in 0..96 {
-        for y in 0..96 {
-            let placement = placements[(y / 8 * 12) + x / 8];
-            let tile = &grids[&placement.id];
-            let rel_x = x % 8;
-            let rel_y = y % 8;
-            compiled_image[x][y] =
-                tile.inner(rel_x, rel_y, placement.transform);
-        }
-    }
-    compiled_image
+) -> Matrix<char> {
+    let inner = (0..96)
+        .map(|row| {
+            (0..96)
+                .map(|col| {
+                    let placement = placements[(row / 8) + col / 8];
+                    let tile = &grids[&placement.id];
+                    let rel_row = row % 8;
+                    let rel_col = col % 8;
+                    tile.inner(rel_row, rel_col, placement.transform)
+                })
+                .collect()
+        })
+        .collect();
+    Matrix { inner }
+}
+
+fn find_monsters(image: &Matrix<char>) -> usize {
+    Transform::all()
+        .drain(..)
+        .map(|transform| find_monsters_with_transform(image, transform))
+        .max()
+        .expect("There's at least one number.")
+}
+
+fn find_monsters_with_transform(
+    image: &Matrix<char>,
+    transform: Transform,
+) -> usize {
+    //                   #
+    // #    ##    ##    ###
+    //  #  #  #  #  #  #
+    let monster_shape = [
+        (0, 18),
+        (1, 0),
+        (1, 5),
+        (1, 6),
+        (1, 11),
+        (1, 12),
+        (1, 17),
+        (1, 18),
+        (1, 19),
+        (2, 1),
+        (2, 4),
+        (2, 7),
+        (2, 10),
+        (2, 13),
+        (2, 16),
+    ];
+    let len = image.inner.len();
+    (0..len)
+        .map(|row| {
+            (0..len)
+                .filter(|col| {
+                    monster_shape.iter().all(|(offset_row, offset_col)| {
+                        let check_row = row + offset_row;
+                        let check_col = col + offset_col;
+                        check_row < len
+                            && check_col < len
+                            && image.get(check_row, check_col, transform) == '#'
+                    })
+                })
+                .count()
+        })
+        .sum()
 }
 
 #[cfg(test)]
