@@ -247,7 +247,8 @@ fn compile_image(
         .map(|row| {
             (0..96)
                 .map(|col| {
-                    let placement = placements[(row / 8) + col / 8];
+                    let index = row / 8 * 12 + col / 8;
+                    let placement = placements[index];
                     let tile = &grids[&placement.id];
                     let rel_row = row % 8;
                     let rel_col = col % 8;
@@ -420,22 +421,22 @@ mod tests {
         );
         assert_eq!(
             example_tile.inner(
-                0,
+                1,
                 2,
                 Transform {
                     flipped: false,
                     rotation: 0
                 }
             ),
-            'c'
+            'k'
         );
         assert_eq!(
             example_tile.inner(
-                0,
                 6,
+                7,
                 Transform {
                     flipped: false,
-                    rotation: 3
+                    rotation: 2
                 }
             ),
             'i'
@@ -450,6 +451,80 @@ mod tests {
                 }
             ),
             'p'
+        );
+    }
+
+    #[test]
+    fn transformations() {
+        let matrix = Matrix {
+            inner: vec![
+                vec!['a', 'b', 'c'],
+                vec!['d', 'e', 'f'],
+                vec!['g', 'h', 'i'],
+            ],
+        };
+
+        let t = Transform {
+            flipped: false,
+            rotation: 1,
+        };
+
+        assert_eq!(
+            (0..3)
+                .map(|r| (0..3)
+                    .map(|c| matrix.get(r, c, t))
+                    .collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            vec![
+                vec!['c', 'f', 'i'],
+                vec!['b', 'e', 'h'],
+                vec!['a', 'd', 'g']
+            ]
+        )
+    }
+
+    #[test]
+    fn monster_detection() {
+        let image = r#"
+.#.#..#.##...#.##..#####
+###....#.#....#..#......
+##.##.###.#.#..######...
+###.#####...#.#####.#..#
+##.#....#.##.####...#.##
+...########.#....#####.#
+....#..#...##..#.#.###..
+.####...#..#.....#......
+#..#.##..#..###.#.##....
+#.####..#.####.#.#.###..
+###.#.#...#.######.#..##
+#.####....##..########.#
+##..##.#...#...#.#.#.#..
+...#..#..#.#.##..###.###
+.#.#....#.##.#...###.##.
+###.#...#..#.##.######..
+.#.#.###.##.##.#..#.##..
+.####.###.#...###.#..#.#
+..#.#..#..#.#.#.####.###
+#..####...#.#.#.###.###.
+#####..#####...###....##
+#.##..#..#...#..####...#
+.#.###..##..##..####.##.
+...###...##...#...#..###
+"#
+        .trim()
+        .split("\n")
+        .map(|s| s.chars().collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+        let matrix = Matrix { inner: image };
+        assert_eq!(2, find_monsters(&matrix));
+        assert_eq!(
+            273,
+            matrix
+                .inner
+                .iter()
+                .map(|row| row.iter().filter(|c| c == &&'#').count())
+                .sum::<usize>()
+                - 30
         );
     }
 }
