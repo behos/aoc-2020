@@ -13,28 +13,9 @@ enum Position {
     Bottom,
 }
 
-impl Position {
-    fn rotate(&self) -> Self {
-        match self {
-            Position::Top => Position::Left,
-            Position::Left => Position::Bottom,
-            Position::Bottom => Position::Right,
-            Position::Right => Position::Top,
-        }
-    }
-
-    fn flip(&self) -> Self {
-        match self {
-            Position::Right => Position::Left,
-            Position::Left => Position::Right,
-            pos => *pos,
-        }
-    }
-}
-
 struct Tile {
     id: usize,
-    grid: [[char; 10]; 10],
+    grid: Matrix<char>,
 }
 
 impl FromStr for Tile {
@@ -52,48 +33,71 @@ impl FromStr for Tile {
             .parse()
             .context("Unparseable id.")?;
 
-        let mut grid = [['.'; 10]; 10];
+        let inner = parts.map(|row| row.chars().collect()).collect();
 
-        parts.enumerate().for_each(|(x, row)| {
-            row.chars().enumerate().for_each(|(y, c)| grid[x][y] = c)
-        });
-
-        Ok(Self { id, grid })
+        Ok(Self {
+            id,
+            grid: Matrix { inner },
+        })
     }
 }
 
 impl Tile {
-    fn row(&self, mut position: Position, placement: Placement) -> Vec<char> {
-        for _ in 0..placement.rotation {
-            position = position.rotate();
-        }
-        if placement.flipped {
-            position = position.flip();
-        }
-
-        let mut row = match position {
-            Position::Top => self.grid[0].to_vec(),
-            Position::Bottom => self.grid[9].iter().copied().rev().collect(),
-            Position::Left => {
-                self.grid.iter().map(|r| r[0]).rev().collect::<Vec<_>>()
+    fn row(&self, position: Position, transform: Transform) -> Vec<char> {
+        let max = self.grid.inner.len() - 1;
+        let range = 0..=max;
+        match position {
+            Position::Top => {
+                range.map(|i| self.grid.get(0, i, transform)).collect()
             }
+            Position::Bottom => range
+                .map(|i| self.grid.get(max, i, transform))
+                .rev()
+                .collect(),
+            Position::Left => range
+                .map(|i| self.grid.get(i, 0, transform))
+                .rev()
+                .collect(),
             Position::Right => {
-                self.grid.iter().map(|r| r[9]).collect::<Vec<_>>()
+                range.map(|i| self.grid.get(i, max, transform)).collect()
             }
-        };
-
-        if placement.flipped {
-            row = row.iter().copied().rev().collect()
         }
-        row
     }
+
+    fn inner(&self, row: usize, col: usize, transform: Transform) -> char {
+        self.grid.get(row + 1, col + 1, transform)
+    }
+}
+
+struct Matrix<T: Copy> {
+    inner: Vec<Vec<T>>,
+}
+
+impl<T: Copy> Matrix<T> {
+    fn get(&self, mut row: usize, mut col: usize, transform: Transform) -> T {
+        let max = self.inner.len() - 1;
+        for _ in 0..transform.rotation {
+            let t = col;
+            col = max - row;
+            row = t;
+        }
+        if transform.flipped {
+            col = max - col;
+        }
+        self.inner[row][col]
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Transform {
+    rotation: usize,
+    flipped: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
 struct Placement {
     id: usize,
-    rotation: usize,
-    flipped: bool,
+    transform: Transform,
 }
 
 fn main() -> Result<()> {
@@ -126,6 +130,9 @@ fn main() -> Result<()> {
     .product::<usize>();
 
     println!("Corner products: {}", corner_product);
+
+    let _compiled_image = compile_image(&grids, &placements);
+
     Ok(())
 }
 
@@ -144,8 +151,10 @@ fn solve(
             for flipped in &[true, false] {
                 let placement = Placement {
                     id,
-                    rotation,
-                    flipped: *flipped,
+                    transform: Transform {
+                        rotation,
+                        flipped: *flipped,
+                    },
                 };
                 if fits(grids, placements, placement) {
                     placements.push(placement);
@@ -171,9 +180,9 @@ fn fits(
     if placements.len() % 12 != 0 {
         let left = placements[placements.len() - 1];
         let left_tile = &grids[&left.id];
-        let left_row = left_tile.row(Position::Right, left);
+        let left_row = left_tile.row(Position::Right, left.transform);
         let tile_row = tile
-            .row(Position::Left, placement)
+            .row(Position::Left, placement.transform)
             .iter()
             .copied()
             .rev()
@@ -188,9 +197,9 @@ fn fits(
             ((placements.len() / 12 - 1) * 12) + placements.len() % 12;
         let top = placements[top_index];
         let top_tile = &grids[&top.id];
-        let top_row = top_tile.row(Position::Bottom, top);
+        let top_row = top_tile.row(Position::Bottom, top.transform);
         let tile_row = tile
-            .row(Position::Top, placement)
+            .row(Position::Top, placement.transform)
             .iter()
             .copied()
             .rev()
@@ -200,6 +209,24 @@ fn fits(
         }
     }
     return true;
+}
+
+fn compile_image(
+    grids: &HashMap<usize, Tile>,
+    placements: &[Placement],
+) -> [[char; 96]; 96] {
+    let mut compiled_image = [['.'; 96]; 96];
+    for x in 0..96 {
+        for y in 0..96 {
+            let placement = placements[(y / 8 * 12) + x / 8];
+            let tile = &grids[&placement.id];
+            let rel_x = x % 8;
+            let rel_y = y % 8;
+            compiled_image[x][y] =
+                tile.inner(rel_x, rel_y, placement.transform);
+        }
+    }
+    compiled_image
 }
 
 #[cfg(test)]
@@ -225,20 +252,18 @@ mod tests {
             vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
             example_tile.row(
                 Position::Top,
-                Placement {
+                Transform {
                     flipped: false,
-                    id: 1787,
                     rotation: 0
                 }
             )
         );
         assert_eq!(
-            vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
+            vec!['#', '#', '#', '.', '#', '#', '#', '#', '#', '#'],
             example_tile.row(
-                Position::Right,
-                Placement {
+                Position::Top,
+                Transform {
                     flipped: false,
-                    id: 1787,
                     rotation: 1
                 }
             )
@@ -247,20 +272,18 @@ mod tests {
             vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
             example_tile.row(
                 Position::Bottom,
-                Placement {
+                Transform {
                     flipped: false,
-                    id: 1787,
                     rotation: 2
                 }
             )
         );
         assert_eq!(
-            vec!['#', '.', '.', '#', '#', '#', '.', '.', '.', '.'],
+            vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
             example_tile.row(
                 Position::Left,
-                Placement {
+                Transform {
                     flipped: false,
-                    id: 1787,
                     rotation: 1
                 }
             )
@@ -270,24 +293,83 @@ mod tests {
             vec!['.', '.', '.', '.', '#', '#', '#', '.', '.', '#'],
             example_tile.row(
                 Position::Bottom,
-                Placement {
+                Transform {
                     flipped: true,
-                    id: 1787,
                     rotation: 0
                 }
             )
         );
 
         assert_eq!(
-            vec!['.', '.', '.', '.', '#', '#', '#', '.', '.', '#'],
+            vec!['#', '.', '.', '.', '.', '#', '.', '.', '#', '.'],
             example_tile.row(
                 Position::Left,
-                Placement {
+                Transform {
                     flipped: true,
-                    id: 1787,
                     rotation: 1
                 }
             )
+        );
+    }
+
+    #[test]
+    fn inner_points() {
+        let example_tile = r#"Tile 1787:
+.#..#....#
+#abcdefgh#
+#ijklmnop#
+.......#..
+...#.....#
+#.....#..#
+#..#....##
+#.....#.##
+##.......#
+....###..#"#
+            .parse::<Tile>()
+            .unwrap();
+        assert_eq!(
+            example_tile.inner(
+                0,
+                0,
+                Transform {
+                    flipped: false,
+                    rotation: 0
+                }
+            ),
+            'a'
+        );
+        assert_eq!(
+            example_tile.inner(
+                0,
+                2,
+                Transform {
+                    flipped: false,
+                    rotation: 0
+                }
+            ),
+            'c'
+        );
+        assert_eq!(
+            example_tile.inner(
+                0,
+                6,
+                Transform {
+                    flipped: false,
+                    rotation: 3
+                }
+            ),
+            'i'
+        );
+        assert_eq!(
+            example_tile.inner(
+                0,
+                6,
+                Transform {
+                    flipped: true,
+                    rotation: 3
+                }
+            ),
+            'p'
         );
     }
 }
