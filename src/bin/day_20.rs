@@ -51,14 +51,12 @@ impl Tile {
             Position::Top => {
                 range.map(|i| self.grid.get(0, i, transform)).collect()
             }
-            Position::Bottom => range
-                .map(|i| self.grid.get(max, i, transform))
-                .rev()
-                .collect(),
-            Position::Left => range
-                .map(|i| self.grid.get(i, 0, transform))
-                .rev()
-                .collect(),
+            Position::Bottom => {
+                range.map(|i| self.grid.get(max, i, transform)).collect()
+            }
+            Position::Left => {
+                range.map(|i| self.grid.get(i, 0, transform)).collect()
+            }
             Position::Right => {
                 range.map(|i| self.grid.get(i, max, transform)).collect()
             }
@@ -209,12 +207,7 @@ fn fits(
         let left = placements[placements.len() - 1];
         let left_tile = &grids[&left.id];
         let left_row = left_tile.row(Position::Right, left.transform);
-        let tile_row = tile
-            .row(Position::Left, placement.transform)
-            .iter()
-            .copied()
-            .rev()
-            .collect::<Vec<_>>();
+        let tile_row = tile.row(Position::Left, placement.transform);
         if left_row != tile_row {
             return false;
         }
@@ -226,12 +219,7 @@ fn fits(
         let top = placements[top_index];
         let top_tile = &grids[&top.id];
         let top_row = top_tile.row(Position::Bottom, top.transform);
-        let tile_row = tile
-            .row(Position::Top, placement.transform)
-            .iter()
-            .copied()
-            .rev()
-            .collect::<Vec<_>>();
+        let tile_row = tile.row(Position::Top, placement.transform);
         if top_row != tile_row {
             return false;
         }
@@ -350,7 +338,7 @@ mod tests {
             )
         );
         assert_eq!(
-            vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
+            vec!['#', '.', '.', '.', '.', '#', '.', '.', '#', '.'],
             example_tile.row(
                 Position::Bottom,
                 Transform {
@@ -360,7 +348,7 @@ mod tests {
             )
         );
         assert_eq!(
-            vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
+            vec!['#', '.', '.', '.', '.', '#', '.', '.', '#', '.'],
             example_tile.row(
                 Position::Left,
                 Transform {
@@ -371,7 +359,7 @@ mod tests {
         );
 
         assert_eq!(
-            vec!['.', '.', '.', '.', '#', '#', '#', '.', '.', '#'],
+            vec!['#', '.', '.', '#', '#', '#', '.', '.', '.', '.'],
             example_tile.row(
                 Position::Bottom,
                 Transform {
@@ -382,7 +370,7 @@ mod tests {
         );
 
         assert_eq!(
-            vec!['#', '.', '.', '.', '.', '#', '.', '.', '#', '.'],
+            vec!['.', '#', '.', '.', '#', '.', '.', '.', '.', '#'],
             example_tile.row(
                 Position::Left,
                 Transform {
