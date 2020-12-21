@@ -108,20 +108,40 @@ struct Transform {
     flipped: bool,
 }
 
-impl Transform {
-    fn all() -> Vec<Self> {
-        (0..=3)
-            .map(|rotation| {
-                [true, false]
-                    .iter()
-                    .copied()
-                    .map(|flipped| Self { rotation, flipped })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect()
-    }
-}
+const ALL_TRANSFORMATIONS: [Transform; 8] = [
+    Transform {
+        rotation: 0,
+        flipped: false,
+    },
+    Transform {
+        rotation: 1,
+        flipped: false,
+    },
+    Transform {
+        rotation: 2,
+        flipped: false,
+    },
+    Transform {
+        rotation: 3,
+        flipped: false,
+    },
+    Transform {
+        rotation: 0,
+        flipped: true,
+    },
+    Transform {
+        rotation: 1,
+        flipped: true,
+    },
+    Transform {
+        rotation: 2,
+        flipped: true,
+    },
+    Transform {
+        rotation: 3,
+        flipped: true,
+    },
+];
 
 #[derive(Clone, Copy, Debug)]
 struct Placement {
@@ -181,7 +201,7 @@ fn solve(
     candidates.sort();
     for id in candidates {
         remaining_ids.remove(&id);
-        for transform in Transform::all() {
+        for &transform in &ALL_TRANSFORMATIONS {
             let placement = Placement { id, transform };
             if fits(grids, placements, placement) {
                 placements.push(placement);
@@ -249,9 +269,9 @@ fn compile_image(
 }
 
 fn find_monsters(image: &Matrix<char>) -> usize {
-    Transform::all()
-        .drain(..)
-        .map(|transform| find_monsters_with_transform(image, transform))
+    ALL_TRANSFORMATIONS
+        .iter()
+        .map(|&transform| find_monsters_with_transform(image, transform))
         .max()
         .expect("There's at least one number.")
 }
