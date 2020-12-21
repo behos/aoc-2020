@@ -56,30 +56,35 @@ fn main() {
     let dangerous_ingredients_candidates = allergen_index
         .iter()
         .map(|(_, a)| a)
-        .cloned()
-        .collect::<HashSet<String>>();
+        .collect::<HashSet<_>>();
     let safe_count = recipes
         .iter()
         .map(|recipe| {
             recipe
                 .ingredients
                 .iter()
-                .filter(|&ing| !dangerous_ingredients_candidates.contains(ing))
+                .filter(|ing| !dangerous_ingredients_candidates.contains(ing))
                 .count()
         })
         .sum::<usize>();
     println!("Safe ingredients appear {} times", safe_count);
 }
 
-fn find_allergens(recipes: &Vec<Recipe>) -> Vec<(String, String)> {
+fn find_allergens(recipes: &Vec<Recipe>) -> Vec<(&String, &String)> {
     let mut comprehensive_list =
         recipes.iter().fold(HashMap::new(), |mut index, recipe| {
             for allergen in &recipe.allergens {
-                let entry =
-                    index.entry(allergen).or_insert(recipe.ingredients.clone());
+                let entry = index.entry(allergen).or_insert(
+                    recipe.ingredients.iter().collect::<HashSet<&String>>(),
+                );
                 *entry = entry
-                    .intersection(&recipe.ingredients)
-                    .cloned()
+                    .intersection(
+                        &recipe
+                            .ingredients
+                            .iter()
+                            .collect::<HashSet<&String>>(),
+                    )
+                    .copied()
                     .collect::<HashSet<_>>()
             }
             index
@@ -90,14 +95,14 @@ fn find_allergens(recipes: &Vec<Recipe>) -> Vec<(String, String)> {
     while let Some(allergen) = comprehensive_list
         .keys()
         .find(|allergen| comprehensive_list[*allergen].len() == 1)
-        .map(|s| s.to_owned())
+        .map(|s| *s)
     {
         let mut ingredients = comprehensive_list.remove(&allergen).unwrap();
         let ingredient = ingredients.drain().next().unwrap();
         for ingredients in comprehensive_list.values_mut() {
             ingredients.remove(&ingredient);
         }
-        pairs.push((allergen.clone(), ingredient));
+        pairs.push((allergen, ingredient));
     }
     pairs
 }
