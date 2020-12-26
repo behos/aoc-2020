@@ -61,19 +61,16 @@ fn lets_play_recursive(
     mut p1: VecDeque<usize>,
     mut p2: VecDeque<usize>,
 ) -> (Player, usize) {
-    let mut p1_hashes = HashSet::new();
-    let mut p2_hashes = HashSet::new();
+    let mut hashes = HashSet::new();
 
     while p1.len() > 0 && p2.len() > 0 {
-        let p1_hash = get_hash(&p1);
-        let p2_hash = get_hash(&p2);
+        let hash = get_hash(&p1, &p2);
 
-        if p1_hashes.contains(&p1_hash) || p2_hashes.contains(&p2_hash) {
+        if hashes.contains(&hash) {
             return (Player::P1, get_score(&p1));
         }
 
-        p1_hashes.insert(p1_hash);
-        p2_hashes.insert(p2_hash);
+        hashes.insert(hash);
 
         let (c1, c2) = (p1.pop_front().unwrap(), p2.pop_front().unwrap());
 
@@ -104,8 +101,9 @@ fn lets_play_recursive(
     };
 }
 
-fn get_hash(deck: &VecDeque<usize>) -> u64 {
+fn get_hash(deck_a: &VecDeque<usize>, deck_b: &VecDeque<usize>) -> u64 {
     let mut hasher = DefaultHasher::new();
-    deck.hash(&mut hasher);
+    deck_a.hash(&mut hasher);
+    deck_b.hash(&mut hasher);
     hasher.finish()
 }
